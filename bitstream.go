@@ -7,6 +7,7 @@ import (
 
 // A Bit is a zero or a one
 type Bit bool
+type ByteOrder bool
 
 const (
 	// Zero is our exported type for '0' bits
@@ -15,9 +16,15 @@ const (
 	One Bit = true
 )
 
+const (
+	BigEndian    ByteOrder = true
+	LittleEndian ByteOrder = false
+)
+
 // A BitReader reads bits from an io.Reader
 type BitReader struct {
 	r     io.Reader
+	o     ByteOrder
 	b     [1]byte
 	count uint8
 }
@@ -30,9 +37,10 @@ type BitWriter struct {
 }
 
 // NewReader returns a BitReader that returns a single bit at a time from 'r'
-func NewReader(r io.Reader) *BitReader {
+func NewReader(r io.Reader, o ByteOrder) *BitReader {
 	b := new(BitReader)
 	b.r = r
+	b.o = o
 	return b
 }
 
@@ -45,9 +53,15 @@ func (b *BitReader) ReadBit() (Bit, error) {
 		b.count = 8
 	}
 	b.count--
-	d := (b.b[0] & 0x80)
-	b.b[0] <<= 1
-	return d != 0, nil
+	if b.o == BigEndian {
+		d := (b.b[0] & 0x80)
+		b.b[0] <<= 1
+		return d != 0, nil
+	} else {
+		d := (b.b[0] & 0x01)
+		b.b[0] >>= 1
+		return d != 0, nil
+	}
 }
 
 // NewWriter returns a BitWriter that buffers bits and write the resulting bytes to 'w'
@@ -69,7 +83,6 @@ func (b *BitWriter) Resume(data byte, count uint8) {
 
 // WriteBit writes a single bit to the stream, writing a new byte to 'w' if required.
 func (b *BitWriter) WriteBit(bit Bit) error {
-
 	if bit {
 		b.b[0] |= 1 << (b.count - 1)
 	}
@@ -89,7 +102,6 @@ func (b *BitWriter) WriteBit(bit Bit) error {
 
 // WriteByte writes a single byte to the stream, regardless of alignment
 func (b *BitWriter) WriteByte(byt byte) error {
-
 	// fill up b.b with b.count bits from byt
 	b.b[0] |= byt >> (8 - b.count)
 
@@ -103,7 +115,6 @@ func (b *BitWriter) WriteByte(byt byte) error {
 
 // ReadByte reads a single byte from the stream, regardless of alignment
 func (b *BitReader) ReadByte() (byte, error) {
-
 	if b.count == 0 {
 		n, err := b.r.Read(b.b[:])
 		if n != 1 || (err != nil && err != io.EOF) {
@@ -135,7 +146,6 @@ func (b *BitReader) ReadByte() (byte, error) {
 
 // ReadBits reads  nbits from the stream
 func (b *BitReader) ReadBits(nbits int) (uint64, error) {
-
 	var u uint64
 
 	for nbits >= 8 {
@@ -149,14 +159,20 @@ func (b *BitReader) ReadBits(nbits int) (uint64, error) {
 	}
 
 	var err error
-	for nbits > 0 && err != io.EOF {
+	for i := 0; nbits > 0 && err != io.EOF; i++ {
 		byt, err := b.ReadBit()
 		if err != nil {
 			return 0, err
 		}
-		u <<= 1
-		if byt {
-			u |= 1
+		if b.o == BigEndian {
+			u <<= 1
+			if byt {
+				u |= 1
+			}
+		} else {
+			if byt {
+				u |= 1 << i
+			}
 		}
 		nbits--
 	}
@@ -166,7 +182,6 @@ func (b *BitReader) ReadBits(nbits int) (uint64, error) {
 
 // Flush empties the currently in-process byte by filling it with 'bit'.
 func (b *BitWriter) Flush(bit Bit) error {
-
 	for b.count != 8 {
 		err := b.WriteBit(bit)
 		if err != nil {
