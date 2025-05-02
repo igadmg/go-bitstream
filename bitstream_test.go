@@ -2,6 +2,7 @@ package bitstream
 
 import (
 	"bytes"
+	"encoding/binary"
 	"fmt"
 	"io"
 	"strings"
@@ -10,7 +11,7 @@ import (
 
 func TestBitStreamEOF(t *testing.T) {
 
-	br := NewReader(strings.NewReader("0"))
+	br := NewReader(strings.NewReader("0"), binary.LittleEndian)
 
 	b, err := br.ReadByte()
 	if b != '0' {
@@ -23,7 +24,7 @@ func TestBitStreamEOF(t *testing.T) {
 	}
 
 	// 0 = 0b00110000
-	br = NewReader(strings.NewReader("0"))
+	br = NewReader(strings.NewReader("0"), binary.LittleEndian)
 
 	buf := bytes.NewBuffer(nil)
 	bw := NewWriter(buf)
@@ -56,7 +57,7 @@ func TestBitStreamEOF(t *testing.T) {
 		t.Error("bad return from 4 read bytes")
 	}
 
-	_, err = NewReader(strings.NewReader("")).ReadBit()
+	_, err = NewReader(strings.NewReader(""), binary.LittleEndian).ReadBit()
 	if err != io.EOF {
 		t.Error("ReadBit on empty string didn't return EOF")
 	}
@@ -79,7 +80,7 @@ func (e *eofReader) Read(p []byte) (int, error) {
 
 func TestBitStreamReadEOF(t *testing.T) {
 
-	br := NewReader(&eofReader{})
+	br := NewReader(&eofReader{}, binary.LittleEndian)
 
 	r, _ := br.ReadBits(8)
 
@@ -92,7 +93,7 @@ func TestBitStreamReadEOF(t *testing.T) {
 func TestBitStream(t *testing.T) {
 
 	buf := bytes.NewBuffer(nil)
-	br := NewReader(strings.NewReader("hello"))
+	br := NewReader(strings.NewReader("hello"), binary.LittleEndian)
 	bw := NewWriter(buf)
 
 	for {
@@ -120,7 +121,7 @@ func TestBitStream(t *testing.T) {
 func TestByteStream(t *testing.T) {
 
 	buf := bytes.NewBuffer(nil)
-	br := NewReader(strings.NewReader("hello"))
+	br := NewReader(strings.NewReader("hello"), binary.LittleEndian)
 	bw := NewWriter(buf)
 
 	for i := 0; i < 3; i++ {
@@ -208,7 +209,7 @@ func TestErrorPropagation(t *testing.T) {
 }
 
 func TestReset(t *testing.T) {
-	r := NewReader(strings.NewReader("abc"))
+	r := NewReader(strings.NewReader("abc"), binary.LittleEndian)
 	b, _ := r.ReadBits(8)
 	if b != 'a' {
 		t.Errorf("expected 'a', got=%08b", b)

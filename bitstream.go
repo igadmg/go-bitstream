@@ -2,12 +2,12 @@
 package bitstream
 
 import (
+	"encoding/binary"
 	"io"
 )
 
 // A Bit is a zero or a one
 type Bit bool
-type ByteOrder bool
 
 const (
 	// Zero is our exported type for '0' bits
@@ -16,15 +16,10 @@ const (
 	One Bit = true
 )
 
-const (
-	BigEndian    ByteOrder = true
-	LittleEndian ByteOrder = false
-)
-
 // A BitReader reads bits from an io.Reader
 type BitReader struct {
 	r     io.Reader
-	o     ByteOrder
+	o     binary.ByteOrder
 	b     [1]byte
 	count uint8
 }
@@ -37,7 +32,7 @@ type BitWriter struct {
 }
 
 // NewReader returns a BitReader that returns a single bit at a time from 'r'
-func NewReader(r io.Reader, o ByteOrder) *BitReader {
+func NewReader(r io.Reader, o binary.ByteOrder) *BitReader {
 	b := new(BitReader)
 	b.r = r
 	b.o = o
@@ -53,7 +48,7 @@ func (b *BitReader) ReadBit() (Bit, error) {
 		b.count = 8
 	}
 	b.count--
-	if b.o == BigEndian {
+	if b.o == binary.BigEndian {
 		d := (b.b[0] & 0x80)
 		b.b[0] <<= 1
 		return d != 0, nil
@@ -164,7 +159,7 @@ func (b *BitReader) ReadBits(nbits int) (uint64, error) {
 		if err != nil {
 			return 0, err
 		}
-		if b.o == BigEndian {
+		if b.o == binary.BigEndian {
 			u <<= 1
 			if byt {
 				u |= 1
